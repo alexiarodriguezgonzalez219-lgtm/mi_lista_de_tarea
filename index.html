@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi lista de tareas</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="contenedor">
+        <h1>Mis tareas</h1>
+        <p>Organizar mis tareas</p>
+
+        <div class="entrada">
+            <input 
+                type="text" 
+                id="nuevaTarea" 
+                placeholder="Escribe una tarea..."
+                maxlength="250"
+            >
+
+            <button id="agregar">Agregar</button>
+        </div>
+
+        <ul id="listaTareas"></ul>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
