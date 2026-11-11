@@ -2,7 +2,6 @@
 
 Mis actividades
 
-![Vista de la app](screenshots/pantalla-escritorio.png)
 
 Una lista de tareas sencilla hecha con HTML, CSS y JavaScript. Las tareas se
 guardan en el navegador con `localStorage`.
@@ -35,9 +34,7 @@ Al instalarla también tendrás un atajo en el menú contextual del icono
 | `manifest.json` | Manifiesto: nombre, colores, ventana, iconos y capturas que usa Windows para instalar la app. |
 | `sw.js` | Service worker: guarda la app en caché para que funcione sin conexión. |
 | `icons/` | Iconos en 192 y 512 px, versiones *maskable*, favicon, icono de Apple y tile de Windows. |
-| `screenshots/` | Capturas que se muestran en el cuadro de instalación. |
-| `browserconfig.xml` | Configuración del tile (icono) de Windows. |
-| `tools/generar_imagenes.py` | Regenera todas las imágenes a partir de `icons/icon-source.png` con `python3 tools/generar_imagenes.py` (requiere Pillow). |
+
 
 ## Tareas
 
