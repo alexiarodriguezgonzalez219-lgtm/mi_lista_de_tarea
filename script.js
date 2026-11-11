@@ -110,3 +110,66 @@ campo.addEventListener("keydown", function(event) {
 });
 
 recuperarTareas();
+
+/* ---------- PWA: instalar en el escritorio y funcionar sin conexión ---------- */
+
+const botonInstalar = document.getElementById("instalarApp");
+const estadoInstalacion = document.getElementById("estadoInstalacion");
+
+const esAppInstalada =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+
+let eventoInstalacion = null;
+
+if (esAppInstalada) {
+    estadoInstalacion.textContent =
+        "Estás usando la app instalada. Tus tareas se guardan en este dispositivo.";
+}
+
+window.addEventListener("beforeinstallprompt", function (evento) {
+    evento.preventDefault();      // evita el aviso automático del navegador
+    eventoInstalacion = evento;   // se usa cuando la persona haga clic en el botón
+
+    if (!esAppInstalada) {
+        botonInstalar.hidden = false;
+    }
+});
+
+botonInstalar.addEventListener("click", async function () {
+    if (!eventoInstalacion) return;
+
+    botonInstalar.hidden = true;
+    await eventoInstalacion.prompt();
+
+    const resultado = await eventoInstalacion.userChoice;
+    if (resultado.outcome !== "accepted") {
+        botonInstalar.hidden = false;
+    }
+
+    eventoInstalacion = null;
+});
+
+window.addEventListener("appinstalled", function () {
+    botonInstalar.hidden = true;
+    estadoInstalacion.textContent =
+        "¡Listo! La app ya está en tu escritorio y funciona sin conexión.";
+});
+
+/* Atajo del icono de Windows: abre la app con el campo listo para escribir */
+if (new URLSearchParams(window.location.search).get("accion") === "nueva") {
+    campo.focus();
+}
+
+/* El service worker solo funciona en HTTPS o localhost (no en file://) */
+if ("serviceWorker" in navigator &&
+    (location.protocol === "https:" ||
+     location.hostname === "localhost" ||
+     location.hostname === "127.0.0.1")) {
+
+    window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").catch(function (error) {
+            console.warn("No se pudo activar el modo sin conexión:", error);
+        });
+    });
+}

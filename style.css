@@ -1,5 +1,9 @@
-{
+*, *::before, *::after {
     box-sizing: border-box;
+}
+
+[hidden] {
+    display: none !important;
 }
 
 body {
@@ -10,6 +14,7 @@ body {
     align-items: center;
     min-height: 100vh;
     margin: 0;
+    padding: 20px;
 }
 
 .contenedor {
@@ -91,4 +96,27 @@ li span {
 
 .eliminar {
     background: #f3a2bc;
+}
+
+.instalacion {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #f7d9e5;
+    text-align: center;
+}
+
+.instalar {
+    width: 100%;
+    background: #d65b87;
+    font-weight: bold;
+}
+
+.instalar:hover {
+    background: #b94872;
+}
+
+.estado {
+    font-size: 12px;
+    line-height: 1.6;
+    margin: 12px 0 0;
 }

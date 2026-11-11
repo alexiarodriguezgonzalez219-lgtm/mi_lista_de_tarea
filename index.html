@@ -4,6 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi lista de tareas</title>
+    <meta name="description" content="Lista de tareas sencilla que puedes instalar en el escritorio de Windows y usar sin conexión.">
+    <meta name="theme-color" content="#d65b87">
+
+    <!-- Manifiesto: permite instalar la app en Windows, macOS, Linux y móviles -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Iconos para el navegador, el escritorio y los tiles de Windows -->
+    <link rel="icon" href="icons/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Mis tareas">
+    <meta name="msapplication-TileColor" content="#d65b87">
+    <meta name="msapplication-TileImage" content="icons/mstile-150x150.png">
+    <meta name="msapplication-config" content="browserconfig.xml">
+
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,9 +29,9 @@
         <p>Organizar mis tareas</p>
 
         <div class="entrada">
-            <input 
-                type="text" 
-                id="nuevaTarea" 
+            <input
+                type="text"
+                id="nuevaTarea"
                 placeholder="Escribe una tarea..."
                 maxlength="250"
             >
@@ -24,6 +40,14 @@
         </div>
 
         <ul id="listaTareas"></ul>
+
+        <div class="instalacion">
+            <button id="instalarApp" class="instalar" hidden>Instalar en el escritorio</button>
+            <p id="estadoInstalacion" class="estado">
+                También puedes instalarla desde el menú <strong>⋯</strong> de Edge o Chrome:
+                <strong>Aplicaciones → Instalar esta aplicación como aplicación</strong>.
+            </p>
+        </div>
     </div>
 
     <script src="script.js"></script>
