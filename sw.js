@@ -16,8 +16,6 @@ const RECURSOS = [
     "./icons/favicon-32.png",
     "./icons/apple-touch-icon.png",
     "./icons/mstile-150x150.png",
-    "./screenshots/pantalla-escritorio.png",
-    "./screenshots/pantalla-movil.png"
 ];
 
 self.addEventListener("install", function (evento) {
