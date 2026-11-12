@@ -1,72 +1,50 @@
-const CACHE = "mis-tareas-v1";
+const CACHE = "mi-lista-v1";
 const ARCHIVOS = [
-    "./",
-    "./index.html",
-    "./style.css",
-    "./script.js",
+  "./",
+  "./index.html",
+  "./style.css",
+  "./script.js"
 ];
 
-self.addEventListener("install", function (evento) {
-    evento.waitUntil(
-        caches.open(CACHE)
-            .then(function (cache) { return cache.addAll(RECURSOS); })
-            .then(function () { return self.skipWaiting(); })
-    );
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(ARCHIVOS))
+  );
+
+  self.skipWaiting();
 });
 
-self.addEventListener("activate", function (evento) {
-    evento.waitUntil(
-        caches.keys()
-            .then(function (nombres) {
-                return Promise.all(
-                    nombres
-                        .filter(function (nombre) { return nombre !== CACHE; })
-                        .map(function (nombre) { return caches.delete(nombre); })
-                );
-            })
-            .then(function () { return self.clients.claim(); })
-    );
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((nombres) =>
+      Promise.all(
+        nombres
+          .filter((nombre) => nombre !== CACHE)
+          .map((nombre) => caches.delete(nombre))
+      )
+    )
+  );
+
+  self.clients.claim();
 });
 
-self.addEventListener("fetch", function (evento) {
-    const peticion = evento.request;
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
 
-    if (peticion.method !== "GET") return;
-    if (new URL(peticion.url).origin !== self.location.origin) return;
+  event.respondWith(
+    fetch(event.request)
+      .then((respuesta) => {
+        const copia = respuesta.clone();
 
-    evento.respondWith(
-        caches.match(peticion).then(function (guardada) {
-            if (guardada) {
-                // Actualiza la caché en segundo plano (stale while revalidate).
-                fetch(peticion)
-                    .then(function (nueva) {
-                        if (nueva && nueva.ok) {
-                            const copia = nueva.clone();
-                            caches.open(CACHE).then(function (cache) {
-                                return cache.put(peticion, copia);
-                            });
-                        }
-                    })
-                    .catch(function () { /* sin conexión: se usa la caché */ });
-                return guardada;
-            }
+        caches.open(CACHE).then((cache) => {
+          cache.put(event.request, copia);
+        });
 
-            return fetch(peticion)
-                .then(function (nueva) {
-                    if (nueva && nueva.ok) {
-                        const copia = nueva.clone();
-                        caches.open(CACHE).then(function (cache) {
-                            return cache.put(peticion, copia);
-                        });
-                    }
-                    return nueva;
-                })
-                .catch(function () {
-                    if (peticion.mode === "navigate") {
-                        return caches.match("./index.html");
-                    }
-                    return new Response("Sin conexión", { status: 503 });
-                });
-        })
-    );
+        return respuesta;
+      })
+      .catch(async () => {
+        const guardada = await caches.match(event.request);
+        return guardada || caches.match("./index.html");
+      })
+  );
 });
