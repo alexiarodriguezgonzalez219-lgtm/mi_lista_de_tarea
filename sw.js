@@ -1,6 +1,3 @@
-/* Service worker: guarda la app en caché para que la versión instalada
-   en el escritorio de Windows funcione también sin conexión. */
-
 const CACHE = "mis-tareas-v1";
 
 const RECURSOS = [
