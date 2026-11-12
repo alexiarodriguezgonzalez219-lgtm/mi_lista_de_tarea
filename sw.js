@@ -1,6 +1,5 @@
 const CACHE = "mis-tareas-v1";
-
-const RECURSOS = [
+const ARCHIVOS = [
     "./",
     "./index.html",
     "./style.css",
