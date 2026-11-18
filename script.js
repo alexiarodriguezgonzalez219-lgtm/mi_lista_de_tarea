@@ -221,13 +221,55 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ---------- Arranque ---------- */
 
+        /* ---------- Arranque ---------- */
+
     recuperarTareas();
     cargarTareas();
     mostrarEstadoRed();
 
-    if (new URLSearchParams(window.location.search).get("accion") === "nueva") {
-        campo.focus();
-    }
+    /* Intercepta Ctrl+Shift+R (y Ctrl+F5 / Shift+F5) para que sin internet
+       recargue usando la caché del Service Worker en vez de dar error de red. */
+    window.addEventListener(
+        "keydown",
+        (evento) => {
+            const esTeclaR =
+                evento.code === "KeyR" ||
+                (typeof evento.key === "string" && evento.key.toLowerCase() === "r");
+
+            const esRecargaForzada =
+                !evento.altKey &&
+                (((evento.ctrlKey || evento.metaKey) && evento.shiftKey && esTeclaR) ||
+                    ((evento.ctrlKey || evento.shiftKey) && evento.key === "F5"));
+
+            if (!esRecargaForzada) return;
+
+            const soportaSW =
+                "serviceWorker" in navigator &&
+                (location.protocol === "https:" ||
+                    location.hostname === "localhost" ||
+                    location.hostname === "127.0.0.1");
+
+            if (!soportaSW) return;
+
+            evento.preventDefault();
+            evento.stopPropagation();
+
+            if (!navigator.onLine) {
+                // Recarga normal: sw.js entrega la app desde caché y localStorage carga las tareas
+                window.location.reload();
+                return;
+            }
+
+            // Si sí hay internet, busca cambios en el SW y recarga
+            navigator.serviceWorker
+                .getRegistration()
+                .then((reg) => (reg ? reg.update().catch(() => {}) : undefined))
+                .finally(() => {
+                    window.location.reload();
+                });
+        },
+        true
+    );
 
     /* ---------- Service worker ---------- */
 
