@@ -1,3 +1,12 @@
+/* ------------------------------------------------------------------
+   script.js — versión corregida
+   1. Todo el arranque va dentro de DOMContentLoaded.
+   2. Lectura/escritura de localStorage blindadas con try/catch.
+   3. Render con delegación de eventos.
+   4. Registro único del SW con updateViaCache: "none".
+   5. Estado del modo sin conexión visible en la página.
+------------------------------------------------------------------- */
+
 const CLAVE = "misTareas";
 
 let tareas = [];
@@ -199,8 +208,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    /* Aviso honesto de conectividad: informativo, NUNCA bloquea el arranque.
-       Éste es el error clásico que deja la app inservible sin red. */
+    /* Aviso honesto de conectividad: informativo, NUNCA bloquea el arranque. */
     function mostrarEstadoRed() {
         if (!estadoInstalacion) return;
         if (navigator.onLine) return;
@@ -223,17 +231,45 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* ---------- Service worker ---------- */
 
-    if ("serviceWorker" in navigator &&
-        (location.protocol === "https:" ||
-         location.hostname === "localhost" ||
-         location.hostname === "127.0.0.1")) {
+    const estadoOffline = document.getElementById("estadoOffline");
 
-        window.addEventListener("load", () => {
-            navigator.serviceWorker
-                .register("./sw.js", { updateViaCache: "none" })
-                .catch((error) => {
-                    console.warn("No se pudo activar el modo sin conexión:", error);
+    function marcarOffline(texto) {
+        if (estadoOffline) estadoOffline.textContent = texto;
+    }
+
+    if (!("serviceWorker" in navigator)) {
+        marcarOffline("Este navegador no soporta el modo sin conexión.");
+    } else if (location.protocol !== "https:" &&
+               location.hostname !== "localhost" &&
+               location.hostname !== "127.0.0.1") {
+        marcarOffline("El modo sin conexión requiere HTTPS (en file:// no funciona).");
+    } else {
+        navigator.serviceWorker
+            .register("./sw.js", { updateViaCache: "none" })
+            .then(async (registro) => {
+                await navigator.serviceWorker.ready;
+
+                const pintarControl = () => {
+                    if (navigator.serviceWorker.controller) {
+                        marcarOffline("Modo sin conexión activo: tus tareas se guardan en este dispositivo.");
+                    } else {
+                        marcarOffline("Preparando el modo sin conexión… recarga la página una vez.");
+                    }
+                };
+
+                pintarControl();
+                // En la primera visita el SW se activa y toma el control un instante
+                // después; esto actualiza el texto sin obligar a recargar.
+                navigator.serviceWorker.addEventListener("controllerchange", pintarControl);
+
+                // Si llega una versión nueva del SW, avisar (sin recargar a la fuerza).
+                registro.addEventListener("updatefound", () => {
+                    marcarOffline("Actualizando la app… cierra y vuelve a abrir para aplicar los cambios.");
                 });
-        });
+            })
+            .catch((error) => {
+                console.warn("No se pudo activar el modo sin conexión:", error);
+                marcarOffline("No se pudo activar el modo sin conexión: " + error.message);
+            });
     }
 });
