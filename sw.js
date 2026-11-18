@@ -1,16 +1,15 @@
 /* ==================================================================
-   sw.js  —  versión 3
-   · No se cachean respuestas REDIRIGIDAS (cache.put lanza TypeError y
-     rompía el guardado del shell en GitHub Pages).
-   · El precaché crítico y el opcional están separados.
-   · Se registra en consola qué archivo falta, con su URL completa.
+   sw.js  —  versión 4
+   · Sube a v4 para reemplazar mi-lista-v3 con el nuevo script.js.
+   · Limpia respuestas redirigidas en vez de descartarlas.
+   · Red primero con respaldo inmediato en caché (siempre funciona offline).
 ================================================================== */
 
-const VERSION = "3";
+const VERSION = "4";
 const PREFIJO = "mi-lista-";
 const CACHE = `${PREFIJO}v${VERSION}`;
 
-/* Críticos: si falta uno, el modo sin conexión queda cojo. */
+/* Críticos: revisa que coincidan EXACTO con los nombres en tu carpeta. */
 const APP_SHELL = [
     "./",
     "./index.html",
@@ -26,24 +25,30 @@ const EXTRA = [
     "./icons/favicon.ico"
 ];
 
+/* Si el servidor redirigió (ej. /ruta -> /ruta/ o /index.html -> /),
+   crea una Response limpia para poder guardarla y servirla sin TypeError. */
+async function limpiarRespuesta(respuesta) {
+    if (!respuesta.redirected) return respuesta;
+    const cuerpo = await respuesta.blob();
+    return new Response(cuerpo, {
+        status: respuesta.status,
+        statusText: respuesta.statusText,
+        headers: respuesta.headers
+    });
+}
+
 async function cachear(cache, url, critico) {
     try {
         const respuesta = await fetch(url, { cache: "reload" });
 
-        if (!respuesta.ok) {
+        if (respuesta.status !== 200) {
             const aviso = `[sw] ${url} -> HTTP ${respuesta.status}`;
             critico ? console.error(aviso) : console.info(aviso);
             return;
         }
 
-        // Una respuesta redirigida no se puede guardar con cache.put:
-        // lanza TypeError. En GitHub Pages ocurre con /ruta -> /ruta/.
-        if (respuesta.redirected) {
-            console.info(`[sw] ${url} respondió con redirección; se omite del precaché.`);
-            return;
-        }
-
-        await cache.put(url, respuesta);
+        const limpia = await limpiarRespuesta(respuesta);
+        await cache.put(url, limpia);
     } catch (error) {
         critico
             ? console.error(`[sw] No se pudo precachear ${url}:`, error)
@@ -63,7 +68,7 @@ self.addEventListener("install", (evento) => {
         if (!shell) {
             console.error(
                 "[sw] CRÍTICO: index.html no está en el caché. " +
-                "El modo sin conexión no funcionará. Revisa la ruta en APP_SHELL."
+                "Revisa la ruta en APP_SHELL."
             );
         } else {
             console.info(`[sw] Listo: app cacheada en "${CACHE}".`);
@@ -93,19 +98,26 @@ self.addEventListener("fetch", (evento) => {
     if (peticion.method !== "GET") return;
     if (new URL(peticion.url).origin !== self.location.origin) return;
 
+    // 1. Navegación (abrir o recargar la página)
     if (peticion.mode === "navigate") {
         evento.respondWith((async () => {
+            const cache = await caches.open(CACHE);
+
             try {
                 const red = await fetch(peticion);
 
-                if (red && red.ok && !red.redirected) {
-                    const cache = await caches.open(CACHE);
-                    cache.put("./index.html", red.clone());
+                if (red && red.status === 200) {
+                    const limpia = await limpiarRespuesta(red.clone());
+                    await cache.put("./index.html", limpia.clone());
+                    await cache.put("./", limpia);
                 }
                 return red;
             } catch (_) {
-                const cache = await caches.open(CACHE);
-                const shell = (await cache.match("./index.html")) || (await cache.match("./"));
+                const shell =
+                    (await cache.match("./index.html")) ||
+                    (await cache.match("./")) ||
+                    (await cache.match(peticion, { ignoreSearch: true }));
+
                 if (shell) return shell;
 
                 return new Response(
@@ -125,22 +137,23 @@ self.addEventListener("fetch", (evento) => {
         return;
     }
 
+    // 2. Recursos (style.css, script.js, manifest.json, iconos)
     evento.respondWith((async () => {
         const cache = await caches.open(CACHE);
-        const guardado = await cache.match(peticion);
 
-        const enRed = fetch(peticion)
-            .then((respuesta) => {
-                if (respuesta && respuesta.ok && !respuesta.redirected) {
-                    cache.put(peticion, respuesta.clone());
-                }
-                return respuesta;
-            })
-            .catch(() => null);
+        try {
+            const red = await fetch(peticion, { cache: "no-cache" });
+            if (red && red.status === 200) {
+                const limpia = await limpiarRespuesta(red.clone());
+                await cache.put(peticion, limpia);
+            }
+            return red;
+        } catch (_) {
+            const guardado =
+                (await cache.match(peticion)) ||
+                (await cache.match(peticion, { ignoreSearch: true }));
 
-        if (guardado) return guardado;
-
-        const respuesta = await enRed;
-        return respuesta || new Response("", { status: 504, statusText: "Sin conexión" });
+            return guardado || new Response("", { status: 504, statusText: "Sin conexión" });
+        }
     })());
 });
