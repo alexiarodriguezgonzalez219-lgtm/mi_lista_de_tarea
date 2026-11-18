@@ -1,275 +1,146 @@
-/* ------------------------------------------------------------------
-   script.js — versión corregida
-   1. Todo el arranque va dentro de DOMContentLoaded.
-   2. Lectura/escritura de localStorage blindadas con try/catch.
-   3. Render con delegación de eventos.
-   4. Registro único del SW con updateViaCache: "none".
-   5. Estado del modo sin conexión visible en la página.
-------------------------------------------------------------------- */
+/* ==================================================================
+   sw.js  —  versión 3
+   · No se cachean respuestas REDIRIGIDAS (cache.put lanza TypeError y
+     rompía el guardado del shell en GitHub Pages).
+   · El precaché crítico y el opcional están separados.
+   · Se registra en consola qué archivo falta, con su URL completa.
+================================================================== */
 
-const CLAVE = "misTareas";
+const VERSION = "3";
+const PREFIJO = "mi-lista-";
+const CACHE = `${PREFIJO}v${VERSION}`;
 
-let tareas = [];
+/* Críticos: si falta uno, el modo sin conexión queda cojo. */
+const APP_SHELL = [
+    "./",
+    "./index.html",
+    "./style.css",
+    "./script.js",
+    "./manifest.json"
+];
 
-document.addEventListener("DOMContentLoaded", () => {
+/* Opcionales: si faltan solo se pierde el icono, no el offline. */
+const EXTRA = [
+    "./icons/icon-192.png",
+    "./icons/icon-512.png",
+    "./icons/favicon.ico"
+];
 
-    const campo = document.getElementById("nuevaTarea");
-    const boton = document.getElementById("agregar");
-    const lista = document.getElementById("listaTareas");
+async function cachear(cache, url, critico) {
+    try {
+        const respuesta = await fetch(url, { cache: "reload" });
 
-    /* ---------- Persistencia ---------- */
-
-    function guardarTareas() {
-        try {
-            localStorage.setItem(CLAVE, JSON.stringify(tareas));
-            return true;
-        } catch (error) {
-            console.error("No se pudieron guardar las tareas:", error);
-            alert("No se pudo guardar: el almacenamiento del navegador está lleno o bloqueado.");
-            return false;
+        if (!respuesta.ok) {
+            const aviso = `[sw] ${url} -> HTTP ${respuesta.status}`;
+            critico ? console.error(aviso) : console.info(aviso);
+            return;
         }
+
+        // Una respuesta redirigida no se puede guardar con cache.put:
+        // lanza TypeError. En GitHub Pages ocurre con /ruta -> /ruta/.
+        if (respuesta.redirected) {
+            console.info(`[sw] ${url} respondió con redirección; se omite del precaché.`);
+            return;
+        }
+
+        await cache.put(url, respuesta);
+    } catch (error) {
+        critico
+            ? console.error(`[sw] No se pudo precachear ${url}:`, error)
+            : console.info(`[sw] Opcional no cacheado ${url}`);
     }
+}
 
-    function recuperarTareas() {
-        let crudo = null;
+/* ---------- INSTALL ---------- */
+self.addEventListener("install", (evento) => {
+    evento.waitUntil((async () => {
+        const cache = await caches.open(CACHE);
 
-        try {
-            crudo = localStorage.getItem(CLAVE);
-        } catch (error) {
-            console.error("localStorage no disponible:", error);
-            tareas = [];
-            return;
+        await Promise.all(APP_SHELL.map((url) => cachear(cache, url, true)));
+        await Promise.all(EXTRA.map((url) => cachear(cache, url, false)));
+
+        const shell = (await cache.match("./index.html")) || (await cache.match("./"));
+        if (!shell) {
+            console.error(
+                "[sw] CRÍTICO: index.html no está en el caché. " +
+                "El modo sin conexión no funcionará. Revisa la ruta en APP_SHELL."
+            );
+        } else {
+            console.info(`[sw] Listo: app cacheada en "${CACHE}".`);
         }
 
-        if (!crudo) {           // null o cadena vacía
-            tareas = [];
-            return;
-        }
+        await self.skipWaiting();
+    })());
+});
 
-        try {
-            const parseado = JSON.parse(crudo);
+/* ---------- ACTIVATE ---------- */
+self.addEventListener("activate", (evento) => {
+    evento.waitUntil((async () => {
+        const nombres = await caches.keys();
+        await Promise.all(
+            nombres
+                .filter((nombre) => nombre.startsWith(PREFIJO) && nombre !== CACHE)
+                .map((nombre) => caches.delete(nombre))
+        );
+        await self.clients.claim();
+    })());
+});
 
-            if (!Array.isArray(parseado)) {
-                console.warn("El dato guardado no es un array, se descarta:", parseado);
-                tareas = [];
-                return;
+/* ---------- FETCH ---------- */
+self.addEventListener("fetch", (evento) => {
+    const peticion = evento.request;
+
+    if (peticion.method !== "GET") return;
+    if (new URL(peticion.url).origin !== self.location.origin) return;
+
+    if (peticion.mode === "navigate") {
+        evento.respondWith((async () => {
+            try {
+                const red = await fetch(peticion);
+
+                if (red && red.ok && !red.redirected) {
+                    const cache = await caches.open(CACHE);
+                    cache.put("./index.html", red.clone());
+                }
+                return red;
+            } catch (_) {
+                const cache = await caches.open(CACHE);
+                const shell = (await cache.match("./index.html")) || (await cache.match("./"));
+                if (shell) return shell;
+
+                return new Response(
+                    `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+                     <meta name="viewport" content="width=device-width,initial-scale=1">
+                     <title>Sin conexión</title></head>
+                     <body style="font-family:system-ui;padding:2rem;line-height:1.6">
+                     <h1>Sin conexión</h1>
+                     <p>No hay red y la copia local de la app no está disponible en este dispositivo.</p>
+                     <p><strong>Tus tareas siguen guardadas en el navegador</strong>: no se han perdido.</p>
+                     <p>Conéctate una vez y la app volverá a quedar disponible sin conexión.</p>
+                     </body></html>`,
+                    { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
+                );
             }
-
-            // Saneado: descarta entradas con forma inesperada en vez de romper el render.
-            tareas = parseado
-                .filter((t) => t && typeof t.texto === "string")
-                .map((t) => ({ texto: t.texto, completada: t.completada === true }));
-
-        } catch (error) {
-            console.error("No se pudo leer el JSON guardado, se empieza vacío:", error);
-            // Se conserva una copia por si el usuario quiere recuperarla a mano.
-            try { localStorage.setItem(CLAVE + "-respaldo", crudo); } catch (_) {}
-            tareas = [];
-        }
+        })());
+        return;
     }
 
-    /* ---------- Render ---------- */
+    evento.respondWith((async () => {
+        const cache = await caches.open(CACHE);
+        const guardado = await cache.match(peticion);
 
-    function cargarTareas() {
-        lista.innerHTML = "";
-
-        if (tareas.length === 0) {
-            const vacio = document.createElement("li");
-            vacio.className = "vacio";
-            vacio.textContent = "No hay tareas todavía.";
-            lista.appendChild(vacio);
-            return;
-        }
-
-        tareas.forEach((tarea, indice) => {
-            const elemento = document.createElement("li");
-
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.checked = tarea.completada;
-            checkbox.dataset.indice = indice;
-            checkbox.dataset.accion = "alternar";
-
-            const texto = document.createElement("span");
-            texto.textContent = tarea.texto;
-            if (tarea.completada) texto.classList.add("completada");
-
-            const eliminar = document.createElement("button");
-            eliminar.textContent = "X";
-            eliminar.classList.add("eliminar");
-            eliminar.dataset.indice = indice;
-            eliminar.dataset.accion = "eliminar";
-
-            elemento.append(checkbox, texto, eliminar);
-            lista.appendChild(elemento);
-        });
-    }
-
-    /* Delegación: un solo listener para todos los elementos, inmune a
-       problemas de índices obsoletos tras un re-render. */
-    lista.addEventListener("click", (evento) => {
-        const objetivo = evento.target;
-        const accion = objetivo.dataset && objetivo.dataset.accion;
-        if (!accion) return;
-
-        const indice = Number(objetivo.dataset.indice);
-        if (!Number.isInteger(indice) || !tareas[indice]) return;
-
-        if (accion === "eliminar") {
-            tareas.splice(indice, 1);
-            guardarTareas();
-            cargarTareas();
-        }
-    });
-
-    lista.addEventListener("change", (evento) => {
-        const objetivo = evento.target;
-        if (objetivo.dataset.accion !== "alternar") return;
-
-        const indice = Number(objetivo.dataset.indice);
-        if (!Number.isInteger(indice) || !tareas[indice]) return;
-
-        tareas[indice].completada = objetivo.checked;
-        guardarTareas();
-        cargarTareas();
-    });
-
-    /* ---------- Alta ---------- */
-
-    function agregar() {
-        const valor = campo.value.trim();
-
-        if (valor === "") {
-            alert("Escribe una tarea primero");
-            return;
-        }
-
-        if (valor.length > 250) {
-            alert("Máximo 250 caracteres");
-            return;
-        }
-
-        tareas.push({ texto: valor, completada: false });
-
-        guardarTareas();
-        cargarTareas();
-
-        campo.value = "";
-        campo.focus();
-    }
-
-    boton.addEventListener("click", agregar);
-
-    campo.addEventListener("keydown", (evento) => {
-        if (evento.key === "Enter") agregar();
-    });
-
-    /* ---------- PWA ---------- */
-
-    const botonInstalar = document.getElementById("instalarApp");
-    const estadoInstalacion = document.getElementById("estadoInstalacion");
-
-    const esAppInstalada =
-        window.matchMedia("(display-mode: standalone)").matches ||
-        window.navigator.standalone === true;
-
-    let eventoInstalacion = null;
-
-    if (esAppInstalada && estadoInstalacion) {
-        estadoInstalacion.textContent =
-            "Estás usando la app instalada. Tus tareas se guardan en este dispositivo.";
-    }
-
-    window.addEventListener("beforeinstallprompt", (evento) => {
-        evento.preventDefault();
-        eventoInstalacion = evento;
-        if (!esAppInstalada && botonInstalar) botonInstalar.hidden = false;
-    });
-
-    if (botonInstalar) {
-        botonInstalar.addEventListener("click", async () => {
-            if (!eventoInstalacion) return;
-
-            botonInstalar.hidden = true;
-            await eventoInstalacion.prompt();
-
-            const resultado = await eventoInstalacion.userChoice;
-            if (resultado.outcome !== "accepted") botonInstalar.hidden = false;
-
-            eventoInstalacion = null;
-        });
-    }
-
-    window.addEventListener("appinstalled", () => {
-        if (botonInstalar) botonInstalar.hidden = true;
-        if (estadoInstalacion) {
-            estadoInstalacion.textContent =
-                "¡Listo! La app ya está en tu escritorio y funciona sin conexión.";
-        }
-    });
-
-    /* Aviso honesto de conectividad: informativo, NUNCA bloquea el arranque. */
-    function mostrarEstadoRed() {
-        if (!estadoInstalacion) return;
-        if (navigator.onLine) return;
-        estadoInstalacion.textContent =
-            "Sin conexión. Puedes seguir usando la app: tus tareas están guardadas en este dispositivo.";
-    }
-
-    window.addEventListener("online", mostrarEstadoRed);
-    window.addEventListener("offline", mostrarEstadoRed);
-
-    /* ---------- Arranque ---------- */
-
-    recuperarTareas();
-    cargarTareas();
-    mostrarEstadoRed();
-
-    if (new URLSearchParams(window.location.search).get("accion") === "nueva") {
-        campo.focus();
-    }
-
-    /* ---------- Service worker ---------- */
-
-    const estadoOffline = document.getElementById("estadoOffline");
-
-    function marcarOffline(texto) {
-        if (estadoOffline) estadoOffline.textContent = texto;
-    }
-
-    if (!("serviceWorker" in navigator)) {
-        marcarOffline("Este navegador no soporta el modo sin conexión.");
-    } else if (location.protocol !== "https:" &&
-               location.hostname !== "localhost" &&
-               location.hostname !== "127.0.0.1") {
-        marcarOffline("El modo sin conexión requiere HTTPS (en file:// no funciona).");
-    } else {
-        navigator.serviceWorker
-            .register("./sw.js", { updateViaCache: "none" })
-            .then(async (registro) => {
-                await navigator.serviceWorker.ready;
-
-                const pintarControl = () => {
-                    if (navigator.serviceWorker.controller) {
-                        marcarOffline("Modo sin conexión activo: tus tareas se guardan en este dispositivo.");
-                    } else {
-                        marcarOffline("Preparando el modo sin conexión… recarga la página una vez.");
-                    }
-                };
-
-                pintarControl();
-                // En la primera visita el SW se activa y toma el control un instante
-                // después; esto actualiza el texto sin obligar a recargar.
-                navigator.serviceWorker.addEventListener("controllerchange", pintarControl);
-
-                // Si llega una versión nueva del SW, avisar (sin recargar a la fuerza).
-                registro.addEventListener("updatefound", () => {
-                    marcarOffline("Actualizando la app… cierra y vuelve a abrir para aplicar los cambios.");
-                });
+        const enRed = fetch(peticion)
+            .then((respuesta) => {
+                if (respuesta && respuesta.ok && !respuesta.redirected) {
+                    cache.put(peticion, respuesta.clone());
+                }
+                return respuesta;
             })
-            .catch((error) => {
-                console.warn("No se pudo activar el modo sin conexión:", error);
-                marcarOffline("No se pudo activar el modo sin conexión: " + error.message);
-            });
-    }
+            .catch(() => null);
+
+        if (guardado) return guardado;
+
+        const respuesta = await enRed;
+        return respuesta || new Response("", { status: 504, statusText: "Sin conexión" });
+    })());
 });
