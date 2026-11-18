@@ -1,15 +1,56 @@
 /* ------------------------------------------------------------------
-   script.js — versión corregida
-   1. Todo el arranque va dentro de DOMContentLoaded.
-   2. Lectura/escritura de localStorage blindadas con try/catch.
-   3. Render con delegación de eventos.
-   4. Registro único del SW con updateViaCache: "none".
-   5. Estado del modo sin conexión visible en la página.
+   script.js — versión corregida con soporte de Ctrl+Shift+R offline
 ------------------------------------------------------------------- */
 
 const CLAVE = "misTareas";
 
 let tareas = [];
+
+/* Intercepta Ctrl+Shift+R / Ctrl+F5 / Shift+F5 para que la recarga pase
+   por sw.js (caché offline) y no dispare el error de red del navegador. */
+window.addEventListener(
+    "keydown",
+    (evento) => {
+        const esTeclaR =
+            evento.code === "KeyR" ||
+            (typeof evento.key === "string" && evento.key.toLowerCase() === "r");
+
+        const esCtrlShiftR =
+            (evento.ctrlKey || evento.metaKey) &&
+            evento.shiftKey &&
+            !evento.altKey &&
+            esTeclaR;
+
+        const esF5Forzado =
+            (evento.ctrlKey || evento.shiftKey) &&
+            !evento.altKey &&
+            evento.key === "F5";
+
+        if (!esCtrlShiftR && !esF5Forzado) return;
+
+        const soportaSW =
+            "serviceWorker" in navigator &&
+            (location.protocol === "https:" ||
+                location.hostname === "localhost" ||
+                location.hostname === "127.0.0.1");
+
+        if (!soportaSW) return;
+
+        evento.preventDefault();
+        evento.stopPropagation();
+
+        if (!navigator.onLine) {
+            window.location.reload();
+            return;
+        }
+
+        navigator.serviceWorker
+            .getRegistration()
+            .then((reg) => (reg ? reg.update().catch(() => {}) : undefined))
+            .finally(() => window.location.reload());
+    },
+    true
+);
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -41,7 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        if (!crudo) {           // null o cadena vacía
+        if (!crudo) {
             tareas = [];
             return;
         }
@@ -55,14 +96,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // Saneado: descarta entradas con forma inesperada en vez de romper el render.
             tareas = parseado
                 .filter((t) => t && typeof t.texto === "string")
                 .map((t) => ({ texto: t.texto, completada: t.completada === true }));
 
         } catch (error) {
             console.error("No se pudo leer el JSON guardado, se empieza vacío:", error);
-            // Se conserva una copia por si el usuario quiere recuperarla a mano.
             try { localStorage.setItem(CLAVE + "-respaldo", crudo); } catch (_) {}
             tareas = [];
         }
@@ -105,8 +144,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    /* Delegación: un solo listener para todos los elementos, inmune a
-       problemas de índices obsoletos tras un re-render. */
     lista.addEventListener("click", (evento) => {
         const objetivo = evento.target;
         const accion = objetivo.dataset && objetivo.dataset.accion;
@@ -175,9 +212,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let eventoInstalacion = null;
 
-    if (esAppInstalada && estadoInstalacion) {
-        estadoInstalacion.textContent =
-            "Estás usando la app instalada. Tus tareas se guardan en este dispositivo.";
+    function mostrarEstadoRed() {
+        if (!estadoInstalacion) return;
+
+        if (!navigator.onLine) {
+            estadoInstalacion.textContent =
+                "Sin conexión. Puedes seguir usando la app: tus tareas están guardadas en este dispositivo.";
+        } else if (esAppInstalada) {
+            estadoInstalacion.textContent =
+                "Estás usando la app instalada. Tus tareas se guardan en este dispositivo.";
+        } else {
+            estadoInstalacion.textContent = "";
+        }
     }
 
     window.addEventListener("beforeinstallprompt", (evento) => {
@@ -208,68 +254,18 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    /* Aviso honesto de conectividad: informativo, NUNCA bloquea el arranque. */
-    function mostrarEstadoRed() {
-        if (!estadoInstalacion) return;
-        if (navigator.onLine) return;
-        estadoInstalacion.textContent =
-            "Sin conexión. Puedes seguir usando la app: tus tareas están guardadas en este dispositivo.";
-    }
-
     window.addEventListener("online", mostrarEstadoRed);
     window.addEventListener("offline", mostrarEstadoRed);
 
     /* ---------- Arranque ---------- */
 
-        /* ---------- Arranque ---------- */
-
     recuperarTareas();
     cargarTareas();
     mostrarEstadoRed();
 
-    /* Intercepta Ctrl+Shift+R (y Ctrl+F5 / Shift+F5) para que sin internet
-       recargue usando la caché del Service Worker en vez de dar error de red. */
-    window.addEventListener(
-        "keydown",
-        (evento) => {
-            const esTeclaR =
-                evento.code === "KeyR" ||
-                (typeof evento.key === "string" && evento.key.toLowerCase() === "r");
-
-            const esRecargaForzada =
-                !evento.altKey &&
-                (((evento.ctrlKey || evento.metaKey) && evento.shiftKey && esTeclaR) ||
-                    ((evento.ctrlKey || evento.shiftKey) && evento.key === "F5"));
-
-            if (!esRecargaForzada) return;
-
-            const soportaSW =
-                "serviceWorker" in navigator &&
-                (location.protocol === "https:" ||
-                    location.hostname === "localhost" ||
-                    location.hostname === "127.0.0.1");
-
-            if (!soportaSW) return;
-
-            evento.preventDefault();
-            evento.stopPropagation();
-
-            if (!navigator.onLine) {
-                // Recarga normal: sw.js entrega la app desde caché y localStorage carga las tareas
-                window.location.reload();
-                return;
-            }
-
-            // Si sí hay internet, busca cambios en el SW y recarga
-            navigator.serviceWorker
-                .getRegistration()
-                .then((reg) => (reg ? reg.update().catch(() => {}) : undefined))
-                .finally(() => {
-                    window.location.reload();
-                });
-        },
-        true
-    );
+    if (new URLSearchParams(window.location.search).get("accion") === "nueva") {
+        campo.focus();
+    }
 
     /* ---------- Service worker ---------- */
 
@@ -300,13 +296,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 };
 
                 pintarControl();
-                // En la primera visita el SW se activa y toma el control un instante
-                // después; esto actualiza el texto sin obligar a recargar.
                 navigator.serviceWorker.addEventListener("controllerchange", pintarControl);
 
-                // Si llega una versión nueva del SW, avisar (sin recargar a la fuerza).
                 registro.addEventListener("updatefound", () => {
-                    marcarOffline("Actualizando la app… cierra y vuelve a abrir para aplicar los cambios.");
+                    const nuevo = registro.installing;
+                    if (!nuevo) return;
+                    nuevo.addEventListener("statechange", () => {
+                        if (nuevo.state === "activated") pintarControl();
+                    });
                 });
             })
             .catch((error) => {
