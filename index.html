@@ -47,15 +47,14 @@
                 También puedes instalarla desde el menú <strong>⋯</strong> de Edge o Chrome:
                 <strong>Aplicaciones → Instalar esta aplicación como aplicación</strong>.
             </p>
+            <!-- Estado del modo sin conexión, visible sin abrir DevTools -->
+            <p id="estadoOffline" class="estado"></p>
         </div>
     </div>
-     <script src="./script.js"></script>
-    
-    <script>
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js")
-      .catch((error) => console.error("Error al registrar:", error));
-  }
-</script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5ca117f2dcdfdf5',t:'MTc5NTAzNzM0Mg=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a5ca117f2dcdfdf5',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+
+    <!-- ÚNICO registro del service worker: vive en script.js.
+         No lo dupliques aquí: dos registros con opciones distintas
+         hacen que la caché de sw.js se comporte de forma impredecible. -->
+    <script src="./script.js" defer></script>
+</body>
 </html>
