@@ -1,7 +1,7 @@
 {
   "name": "Mi lista de tareas",
   "short_name": "Mis tareas",
-  "description": "Una lista de tareas sencilla para organizar tus actividades. Se puede instalar en el escritorio de Windows y funciona sin conexión.",
+  "description": "Lista de tareas sincronizada en tiempo real entre celular y computadora. Instalable y con modo sin conexión.",
   "lang": "es-MX",
   "dir": "ltr",
   "start_url": "./index.html",

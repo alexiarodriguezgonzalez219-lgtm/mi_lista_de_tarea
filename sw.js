@@ -1,19 +1,20 @@
 /* ==================================================================
-   sw.js  —  versión 4
-   · Sube a v4 para reemplazar mi-lista-v3 con el nuevo script.js.
-   · Limpia respuestas redirigidas en vez de descartarlas.
-   · Red primero con respaldo inmediato en caché (siempre funciona offline).
+   sw.js  —  versión 5 (con soporte Firebase + caché offline)
+   · Sube a v5 para actualizar mi-lista-v4 con los nuevos archivos.
+   · Incluye firebase-config.js en el APP_SHELL y cachea los módulos
+     del SDK de Firebase (gstatic.com) para que abra incluso sin red.
 ================================================================== */
 
-const VERSION = "4";
+const VERSION = "5";
 const PREFIJO = "mi-lista-";
 const CACHE = `${PREFIJO}v${VERSION}`;
 
-/* Críticos: revisa que coincidan EXACTO con los nombres en tu carpeta. */
+/* Críticos: coinciden exacto con los archivos del repositorio. */
 const APP_SHELL = [
     "./",
     "./index.html",
     "./style.css",
+    "./firebase-config.js",
     "./script.js",
     "./manifest.json"
 ];
@@ -25,8 +26,6 @@ const EXTRA = [
     "./icons/favicon.ico"
 ];
 
-/* Si el servidor redirigió (ej. /ruta -> /ruta/ o /index.html -> /),
-   crea una Response limpia para poder guardarla y servirla sin TypeError. */
 async function limpiarRespuesta(respuesta) {
     if (!respuesta.redirected) return respuesta;
     const cuerpo = await respuesta.blob();
@@ -66,10 +65,7 @@ self.addEventListener("install", (evento) => {
 
         const shell = (await cache.match("./index.html")) || (await cache.match("./"));
         if (!shell) {
-            console.error(
-                "[sw] CRÍTICO: index.html no está en el caché. " +
-                "Revisa la ruta en APP_SHELL."
-            );
+            console.error("[sw] CRÍTICO: index.html no está en el caché.");
         } else {
             console.info(`[sw] Listo: app cacheada en "${CACHE}".`);
         }
@@ -96,7 +92,31 @@ self.addEventListener("fetch", (evento) => {
     const peticion = evento.request;
 
     if (peticion.method !== "GET") return;
-    if (new URL(peticion.url).origin !== self.location.origin) return;
+
+    const url = new URL(peticion.url);
+
+    // Cachear los módulos estáticos del SDK de Firebase (gstatic.com) para que carguen offline
+    if (url.hostname === "www.gstatic.com" && url.pathname.startsWith("/firebasejs/")) {
+        evento.respondWith((async () => {
+            const cache = await caches.open(CACHE);
+            const guardado = await cache.match(peticion);
+            if (guardado) return guardado;
+
+            try {
+                const red = await fetch(peticion);
+                if (red && red.status === 200) {
+                    await cache.put(peticion, red.clone());
+                }
+                return red;
+            } catch (_) {
+                return new Response("", { status: 504, statusText: "SDK sin conexión" });
+            }
+        })());
+        return;
+    }
+
+    // No interceptar llamadas en vivo a las APIs de Firebase Auth / Firestore
+    if (url.origin !== self.location.origin) return;
 
     // 1. Navegación (abrir o recargar la página)
     if (peticion.mode === "navigate") {
@@ -126,9 +146,7 @@ self.addEventListener("fetch", (evento) => {
                      <title>Sin conexión</title></head>
                      <body style="font-family:system-ui;padding:2rem;line-height:1.6">
                      <h1>Sin conexión</h1>
-                     <p>No hay red y la copia local de la app no está disponible en este dispositivo.</p>
-                     <p><strong>Tus tareas siguen guardadas en el navegador</strong>: no se han perdido.</p>
-                     <p>Conéctate una vez y la app volverá a quedar disponible sin conexión.</p>
+                     <p>Conéctate una vez a internet para guardar la aplicación en este dispositivo.</p>
                      </body></html>`,
                     { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
                 );
@@ -137,7 +155,7 @@ self.addEventListener("fetch", (evento) => {
         return;
     }
 
-    // 2. Recursos (style.css, script.js, manifest.json, iconos)
+    // 2. Recursos propios (style.css, firebase-config.js, script.js, manifest.json, iconos)
     evento.respondWith((async () => {
         const cache = await caches.open(CACHE);
 

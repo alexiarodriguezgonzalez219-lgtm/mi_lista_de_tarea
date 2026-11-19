@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Cada usuario autenticado SOLO puede leer, crear, editar y borrar
+    // las tareas dentro de su propia carpeta privada (/usuarios/{uid}/tareas).
+    match /usuarios/{userId}/tareas/{tareaId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

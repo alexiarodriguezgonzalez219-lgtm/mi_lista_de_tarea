@@ -19,9 +19,9 @@ body {
 
 .contenedor {
     background: #fffafd;
-    width: 90%;
-    max-width: 450px;
-    padding: 30px;
+    width: 95%;
+    max-width: 470px;
+    padding: 28px;
     border-radius: 20px;
     box-shadow: 0 5px 20px rgba(214, 91, 135, 0.15);
 }
@@ -29,6 +29,7 @@ body {
 h1 {
     color: #d65b87;
     text-align: center;
+    margin: 0 0 6px;
 }
 
 p {
@@ -36,23 +37,132 @@ p {
     text-align: center;
 }
 
-.entrada {
+.subtitulo {
+    margin: 0 0 16px;
+    font-size: 14px;
+}
+
+/* ---------- Panel de cuenta y sincronización ---------- */
+
+.panel-cuenta {
+    margin-bottom: 18px;
+}
+
+.caja-estado,
+.caja-config,
+.caja-conectado,
+.banner-migracion {
+    background: #fff0f5;
+    border: 1px solid #f5cadb;
+    border-radius: 14px;
+    padding: 12px 14px;
+}
+
+.caja-config {
+    margin-top: 10px;
+}
+
+.banner-migracion {
+    margin-top: 10px;
+    background: #fff7fa;
+    border-style: dashed;
+}
+
+.banner-migracion p {
+    font-size: 12.5px;
+    margin: 0 0 10px;
+    text-align: left;
+    color: #805568;
+}
+
+.estado-titulo {
+    margin: 0 0 4px;
+    font-size: 13.5px;
+    font-weight: bold;
+    color: #b94872;
+    text-align: left;
+}
+
+.estado-detalle {
+    margin: 0 0 10px;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: #8f5c71;
+    text-align: left;
+}
+
+.cabecera-sync {
     display: flex;
-    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
 }
 
-input {
-    flex: 1;
+.badge-modo {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 3px 9px;
+    border-radius: 999px;
+}
+
+.badge-local {
+    background: #f8d6e3;
+    color: #9e476b;
+}
+
+.badge-nube {
+    background: #e3f6ec;
+    color: #217a4b;
+}
+
+.badge-offline {
+    background: #fff2db;
+    color: #9c6514;
+}
+
+.caja-conectado {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.info-usuario {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     min-width: 0;
-    padding: 12px;
-    border: 1px solid #f2b6cc;
-    border-radius: 10px;
-    outline: none;
 }
 
-input:focus {
-    border-color: #e879a5;
+.avatar-usuario {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #f2b6cc;
+    flex-shrink: 0;
 }
+
+.datos-usuario {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    min-width: 0;
+}
+
+.nombre-usuario {
+    font-size: 13px;
+    font-weight: bold;
+    color: #805568;
+    max-width: 220px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Botones de cuenta */
 
 button {
     background: #e879a5;
@@ -61,16 +171,190 @@ button {
     padding: 12px;
     border-radius: 10px;
     cursor: pointer;
-    transition: 0.3s;
+    transition: 0.25s;
+    font-size: 14px;
 }
 
 button:hover {
     background: #d65b87;
 }
 
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-google {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    background: #ffffff;
+    color: #4a3540;
+    border: 1px solid #ecc2d2;
+    font-weight: bold;
+    padding: 10px 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.btn-google:hover {
+    background: #fff7fa;
+    border-color: #d65b87;
+}
+
+.icono-google {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.acordeon-correo {
+    margin-top: 10px;
+    font-size: 12.5px;
+    color: #9e5c76;
+}
+
+.acordeon-correo summary {
+    cursor: pointer;
+    user-select: none;
+    text-align: center;
+    padding: 4px 0;
+}
+
+.form-correo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.fila-botones {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-primario {
+    flex: 1;
+    background: #d65b87;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.btn-secundario {
+    width: 100%;
+    flex: 1;
+    background: #f5c6d8;
+    color: #7c3552;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.btn-secundario:hover {
+    background: #eeb0c8;
+}
+
+.btn-texto {
+    background: transparent;
+    color: #9e5c76;
+    padding: 8px 10px;
+    font-size: 12.5px;
+}
+
+.btn-texto:hover {
+    background: #fbe1eb;
+}
+
+.btn-icono {
+    background: transparent;
+    padding: 4px 7px;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.btn-icono:hover {
+    background: #f8d6e3;
+}
+
+.btn-salir {
+    background: #f5c6d8;
+    color: #7c3552;
+    padding: 7px 11px;
+    font-size: 12px;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.btn-salir:hover {
+    background: #ebb1c7;
+}
+
+textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #f2b6cc;
+    border-radius: 10px;
+    font-family: monospace;
+    font-size: 12px;
+    resize: vertical;
+    margin-bottom: 8px;
+    outline: none;
+    background: #ffffff;
+}
+
+textarea:focus {
+    border-color: #e879a5;
+}
+
+code {
+    background: #fbe1eb;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 11.5px;
+}
+
+.mensaje-error {
+    color: #b71c1c;
+    background: #ffebee;
+    border: 1px solid #ffcdd2;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 12px;
+    margin: 8px 0 0;
+    text-align: left;
+}
+
+/* ---------- Entrada y lista de tareas ---------- */
+
+.entrada {
+    display: flex;
+    gap: 8px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+    flex: 1;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #f2b6cc;
+    border-radius: 10px;
+    outline: none;
+    background: #ffffff;
+    font-size: 14px;
+}
+
+input:focus {
+    border-color: #e879a5;
+}
+
 ul {
     padding: 0;
     list-style: none;
+    margin: 12px 0 0;
 }
 
 li {
@@ -82,6 +366,21 @@ li {
     margin-top: 10px;
     border-radius: 10px;
     color: #805568;
+}
+
+li.vacio {
+    justify-content: center;
+    color: #b47b91;
+    font-style: italic;
+    background: transparent;
+}
+
+li input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #d65b87;
+    cursor: pointer;
+    flex-shrink: 0;
 }
 
 li span {
@@ -96,7 +395,13 @@ li span {
 
 .eliminar {
     background: #f3a2bc;
+    padding: 7px 11px;
+    font-size: 12px;
+    font-weight: bold;
+    flex-shrink: 0;
 }
+
+/* ---------- Pie PWA ---------- */
 
 .instalacion {
     margin-top: 24px;
