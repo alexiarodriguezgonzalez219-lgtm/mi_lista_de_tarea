@@ -5,7 +5,7 @@
      del SDK de Firebase (gstatic.com) para que abra incluso sin red.
 ================================================================== */
 
-const VERSION = "5";
+const VERSION = "6";
 const PREFIJO = "mi-lista-";
 const CACHE = `${PREFIJO}v${VERSION}`;
 
